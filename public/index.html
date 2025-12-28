@@ -1,0 +1,192 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sensor Dashboard (WebSocket)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      margin: 12px;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 16px;
+    }
+
+    .card {
+      border: 1px solid #ddd;
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .chat {
+      height: 300px;
+      overflow: auto;
+      background: #fafafa
+    }
+
+    .sensor-list {
+      max-height: 220px;
+      overflow: auto
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Sensor Dashboard (WebSocket)</h1>
+  <div class="container">
+    <div>
+      <div class="card">
+        <h3>Live charts</h3>
+        <canvas id="chartTemp" width="600" height="200"></canvas>
+      </div>
+
+      <div class="card" style="margin-top:12px;">
+        <h3>Sensores</h3>
+        <div id="sensors" class="sensor-list"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h3>Conexión y control</h3>
+        <div>Client ID: <span id="clientId">—</span></div>
+        <div style="margin-top:8px;">
+          <label>Set interval sensor: </label>
+          <select id="sensorSelect"></select>
+          <input id="intervalInput" type="number" value="1000" /> <button id="setIntervalBtn">Set</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px;">
+        <h3>Chat público</h3>
+        <div id="chat" class="chat"></div>
+        <input id="chatInput" placeholder="Mensaje..." style="width:80%" />
+        <button id="sendChat">Enviar</button>
+      </div>
+
+      <div class="card" style="margin-top:12px;">
+        <h3>Mensajes privados</h3>
+        <div>Enviar a (clientId): <input id="pmTo" style="width: 100%" placeholder="UUID cliente" /></div>
+        <input id="pmText" placeholder="Texto privado" style="width:80%" />
+        <button id="sendPm">Enviar PM</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ws = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host);
+    const sensorsDiv = document.getElementById('sensors');
+    const clientIdSpan = document.getElementById('clientId');
+    const chartCtx = document.getElementById('chartTemp').getContext('2d');
+
+    const chart = new Chart(chartCtx, {
+      type: 'line',
+      data: { labels: [], datasets: [{ label: 'Temp (°C)', data: [], tension: 0.3 }] },
+      options: { animation: false, scales: { x: { display: true }, y: { beginAtZero: false } } }
+    });
+
+    const sensorMap = new Map();
+
+    function appendChat(msg) {
+      const chatDiv = document.getElementById('chat');
+      const el = document.createElement('div');
+      el.textContent = msg;
+      chatDiv.appendChild(el);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+    }
+
+    ws.addEventListener('open', () => appendChat('[system] conexión abierta'));
+
+    ws.addEventListener('message', (ev) => {
+      let parsed;
+      try { parsed = JSON.parse(ev.data); } catch (e) { return; }
+      const { event, data } = parsed;
+
+      switch (event) {
+        case 'connected':
+          clientIdSpan.textContent = data.clientId;
+          // populate sensor select
+          const select = document.getElementById('sensorSelect');
+          select.innerHTML = '';
+          data.sensors.forEach(s => { const opt = document.createElement('option'); opt.value = s.id; opt.text = `${s.id} (${s.type})`; select.appendChild(opt); });
+          appendChat(`[system] clientId: ${data.clientId}`);
+          break;
+
+        case 'sensor_update':
+          // update sensor map and UI
+          sensorMap.set(data.sensorId, data);
+          renderSensors();
+          // if temperature sensor, push to chart
+          if (data.type === 'temperature') {
+            const time = new Date(data.timestamp).toLocaleTimeString();
+            chart.data.labels.push(time);
+            chart.data.datasets[0].data.push(data.value);
+            if (chart.data.labels.length > 30) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+            chart.update();
+          }
+          break;
+
+        case 'chat':
+          appendChat(`[${new Date(data.timestamp).toLocaleTimeString()}] ${data.from}: ${data.text}`);
+          break;
+
+        case 'private_message':
+          appendChat(`[PM] ${data.from}: ${data.text}`);
+          break;
+
+        case 'presence':
+          appendChat(`[presence] ${data.clientId} ${data.status}`);
+          break;
+
+        case 'ok':
+          appendChat(`[ok] ${data.msg}`);
+          break;
+
+        case 'error':
+          appendChat(`[error] ${data.msg}`);
+          break;
+
+        default:
+          console.log('unknown', parsed);
+      }
+    });
+
+    function renderSensors() {
+      sensorsDiv.innerHTML = '';
+      for (const [id, s] of sensorMap.entries()) {
+        const el = document.createElement('div');
+        el.textContent = `${s.sensorId} (${s.type}) = ${s.value}`;
+        sensorsDiv.appendChild(el);
+      }
+    }
+
+    document.getElementById('sendChat').addEventListener('click', () => {
+      const text = document.getElementById('chatInput').value.trim();
+      if (!text) return;
+      ws.send(JSON.stringify({ event: 'chat', data: { text } }));
+      document.getElementById('chatInput').value = '';
+    });
+
+    document.getElementById('setIntervalBtn').addEventListener('click', () => {
+      const sensorId = document.getElementById('sensorSelect').value;
+      const ms = Number(document.getElementById('intervalInput').value) || 1000;
+      ws.send(JSON.stringify({ event: 'set_sensor_interval', data: { sensorId, intervalMs: ms } }));
+    });
+
+    document.getElementById('sendPm').addEventListener('click', () => {
+      const to = document.getElementById('pmTo').value.trim();
+      const text = document.getElementById('pmText').value.trim();
+      if (!to || !text) return;
+      ws.send(JSON.stringify({ event: 'private_message', data: { to, text } }));
+      document.getElementById('pmText').value = '';
+    });
+  </script>
+</body>
+
+</html>
