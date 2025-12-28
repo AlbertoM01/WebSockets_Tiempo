@@ -28,7 +28,7 @@ class Sensor {
   start(broadcastFn) {
     if (this.timer) return;
     this.timer = setInterval(() => {
- 
+
       const drift = (Math.random() - 0.5) * (this.valueRange[1] - this.valueRange[0]) * 0.01;
       this.value = +(Math.min(this.valueRange[1], Math.max(this.valueRange[0], this.value + drift))).toFixed(2);
       const payload = {
@@ -92,7 +92,7 @@ wss.on('connection', (ws, req) => {
 
     const { event, data } = parsed;
 
-    switch(event) {
+    switch (event) {
       case 'subscribe': {
         ws.send(JSON.stringify({ event: 'subscribed', data }));
         break;
