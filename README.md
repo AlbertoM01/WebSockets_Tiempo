@@ -45,6 +45,7 @@ Definidas en `package.json`:
 
 ## 📂 Estructura del proyecto
 
+```
 /WebSockets_Tiempo  
 ├── server.js  
 ├── package.json  
@@ -52,7 +53,8 @@ Definidas en `package.json`:
 ├── .gitignore  
 ├── README.md  
 └── public/  
-     └── index.html  
+    └── index.html  
+```
 
 ---
 
