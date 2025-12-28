@@ -45,14 +45,14 @@ Definidas en `package.json`:
 
 ## 📂 Estructura del proyecto
 
-/WebSockets_Tiempo
-├── server.js
-├── package.json
-├── package-lock.json
-├── .gitignore
-├── README.md
-└── public/
-    └── index.html
+/WebSockets_Tiempo  
+├── server.js  
+├── package.json  
+├── package-lock.json  
+├── .gitignore  
+├── README.md  
+└── public/  
+    └── index.html  
 
 ---
 
@@ -71,7 +71,7 @@ Comprobar versiones:
 
 2️⃣ Clonar el repositorio
 1. git clone https://github.com/AlbertoM01/WebSockets_Tiempo.git
-2. cd NOMBRE_REPOSITORIO
+2. cd WebSockets_Tiempo
 
 3️⃣ Instalar dependencias
 npm install
