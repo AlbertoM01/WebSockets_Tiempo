@@ -52,7 +52,7 @@ Definidas en `package.json`:
 ├── .gitignore  
 ├── README.md  
 └── public/  
-    └── index.html  
+     └── index.html  
 
 ---
 
